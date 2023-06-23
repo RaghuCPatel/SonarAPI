@@ -1,0 +1,34 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 14
+  pre_build: # commands to be run before build
+    commands:
+    - echo Logging in to Amazon ECR....
+    - aws --version
+    # login to Elastic container registry
+    - REPOSITORY_URI=${ECR_RepoUrl}
+    - PROJECT_NAME=${Project_Name}
+    - IMAGE_TAG=${Env}
+    - TASK_DEFINTION_NAME=${ECS_TaskDefinition}
+    - CLUSTER_NAME=${ECS_Cluster}
+    - SERVICE_NAME=${ECS_Service}
+    - REGION=${Region}
+    - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+  build:
+    commands:
+    - echo Build started on `date`
+    - echo Building the Docker image...
+    - docker build -t $PROJECT_NAME:$IMAGE_TAG .
+    - docker tag $PROJECT_NAME:$IMAGE_TAG $REPOSITORY_URI/$PROJECT_NAME:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker image ls -a
+      - docker push $REPOSITORY_URI/$PROJECT_NAME:$IMAGE_TAG
+      - echo Build done..
+      - echo Update Service..
+      - aws ecs update-service --cluster "${CLUSTER_NAME}" --service "${SERVICE_NAME}"  --task-definition "${TASK_DEFINTION_NAME}" --force-new-deployment
